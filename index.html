@@ -570,7 +570,9 @@
   function applyPreset(name){ var p=PRESETS[name]; if(!p) return; fx.subbass=p.subbass;fx.bass=p.bass;fx.mid=p.mid;fx.treble=p.treble;fx.width=p.width;fx.loud=p.loud; updateFxLabels(); markPreset(name); updateMediaFx(); }
 
   pickBtn.addEventListener('click', function(){ fileInput.click(); });
-  // YouTube = echter <a target=_blank> Link -> iPhone gibt ihn an Standard-Browser (Brave), Mac-App an YouTube.app
+  // YouTube-Knopf: am Mac öffnet er sauber Brave/YouTube.app. Am iPhone erzwingt iOS ein Safari-Fenster
+  // (mit Werbung) und ignoriert Brave -> darum auf iPhone/iPad ausblenden (ehrlich, kein falsches Versprechen).
+  (function(){ var yt=document.getElementById('yt'); if(yt && /iPhone|iPad|iPod/.test(navigator.userAgent||'')) yt.style.display='none'; })();
   fileInput.addEventListener('change', function(e){ if(e.target.files[0]) loadFile(e.target.files[0]); fileInput.value=''; });
   chipsWrap.addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) applyPreset(b.dataset.preset); });
   gain.addEventListener('input', function(){ updateGainLabel(); updateMediaFx(); });
