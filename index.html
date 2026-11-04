@@ -17,7 +17,7 @@
     color:var(--text);
     font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",Roboto,sans-serif;
     min-height:100dvh; -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
-    padding:env(safe-area-inset-top) 16px calc(env(safe-area-inset-bottom) + 18px);
+    padding:calc(env(safe-area-inset-top) + 12px) 15px calc(env(safe-area-inset-bottom) + 12px);
     background:
       radial-gradient(900px 500px at 50% -8%, rgba(255,122,77,.22), transparent 60%),
       radial-gradient(700px 600px at 100% 0%, rgba(120,90,255,.10), transparent 55%),
@@ -35,7 +35,7 @@
   header p{margin:2px 0 0;font-size:12.5px;color:var(--muted);letter-spacing:.1px}
   .card{
     background:var(--glass); border:1px solid var(--glassLine); border-radius:var(--radius);
-    padding:18px; backdrop-filter:blur(26px) saturate(180%); -webkit-backdrop-filter:blur(26px) saturate(180%);
+    padding:15px; backdrop-filter:blur(26px) saturate(180%); -webkit-backdrop-filter:blur(26px) saturate(180%);
     box-shadow:0 20px 50px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
   }
   .btn{min-height:52px;border:none;border-radius:15px;font-size:15.5px;font-weight:650;cursor:pointer;
@@ -63,7 +63,7 @@
         box-shadow:0 5px 14px rgba(255,90,46,.4), inset 0 1px 0 rgba(255,255,255,.35)}
   .chip:active{transform:scale(.96)}
   .chip:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
-  label.row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin:14px 3px 5px;
+  label.row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin:10px 3px 4px;
             font-weight:600;letter-spacing:.3px;text-transform:uppercase}
   label.row span:last-child{color:var(--text);font-variant-numeric:tabular-nums}
   input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:30px;background:transparent;cursor:pointer}
@@ -92,11 +92,11 @@
   .btn.ghost[aria-pressed="true"]{background:linear-gradient(145deg,var(--accent2),var(--accent));color:#20100a;
              box-shadow:0 6px 16px rgba(255,90,46,.35)}
   .btn.sm{min-height:46px;font-size:14px}
-  .pl{margin-top:16px}
+  .pl{margin-top:12px}
   .pl-head{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-weight:700;
-           letter-spacing:.4px;text-transform:uppercase;margin:0 3px 7px}
+           letter-spacing:.4px;text-transform:uppercase;margin:0 3px 6px}
   .pl-head b{color:var(--accent2);font-variant-numeric:tabular-nums}
-  .pl-list{max-height:148px;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  .pl-list{max-height:112px;overflow-y:auto;-webkit-overflow-scrolling:touch;
            display:flex;flex-direction:column;gap:6px;padding-right:2px}
   .pl-list::-webkit-scrollbar{width:6px}
   .pl-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px}
@@ -123,18 +123,6 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <div class="logo" aria-hidden="true">
-      <svg viewBox="0 0 24 24" fill="none" stroke="#1a1a1a" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>
-      </svg>
-    </div>
-    <div>
-      <h1>Lauter</h1>
-      <p>Lauter &amp; besserer Klang – fürs Auto</p>
-    </div>
-  </header>
-
   <div class="card">
     <button id="pick" class="btn primary" type="button">🎵 Lied / Video wählen</button>
     <input id="file" type="file" accept="audio/*,video/*" class="hidden">
@@ -156,8 +144,8 @@
         <button class="chip" data-preset="autobass" aria-pressed="false">Bass+</button>
       </div>
 
-      <label class="row" for="gain"><span>Lautstärke</span><span id="gainlbl">+14 dB</span></label>
-      <input id="gain" type="range" min="0" max="24" step="1" value="14">
+      <label class="row" for="gain"><span>Lautstärke</span><span id="gainlbl">87 %</span></label>
+      <input id="gain" type="range" min="0" max="24" step="1" value="20">
 
       <label class="row" for="fx_bass"><span>Bass</span><span id="fx_basslbl">0 dB</span></label>
       <input id="fx_bass" type="range" min="-12" max="12" step="1" value="0">
@@ -178,7 +166,7 @@
     </div>
   </div>
 
-  <p class="hint">🔒 Nur auf deinem Gerät · 24-bit Studio-Klang (kein Verzerren) · ⚠️ laut mit Maß</p>
+  <p class="hint">🔒 Nur auf deinem Gerät · ⚠️ laut mit Maß</p>
 </div>
 
 <script>
@@ -262,9 +250,11 @@
     lim.threshold.value=live?-1:-1.5; lim.knee.value=live?2:0; lim.ratio.value=live?8:20;
     lim.attack.value=live?0.004:0.001; lim.release.value=live?0.12:0.05;
     var trim=c.createGain(); trim.gain.value=live?0.95:0.9;
-    node.connect(drive); drive.connect(comp); comp.connect(lim); lim.connect(trim);
-    if(store){ store.eq=eq; store.width=width; store.drive=drive; store.comp=comp; }
-    return trim;
+    // Ausgangs-Lautstärke NACH dem Limiter: Regler = klar hörbar leise..laut, ohne Clipping
+    var out=c.createGain(); out.gain.value = live ? volLevel() : 1;
+    node.connect(drive); drive.connect(comp); comp.connect(lim); lim.connect(trim); trim.connect(out);
+    if(store){ store.eq=eq; store.width=width; store.drive=drive; store.comp=comp; store.out=out; }
+    return out;
   }
 
   var audioPeak = 1;  // einmal beim Laden gemessen (nicht bei jedem Regler neu!)
@@ -279,7 +269,10 @@
   // ==== LIVE: Media-Element (Audio/Video) -> Live-Kette (EQ live, kein Neustart) ====
   var mctx=null, graphs=new WeakMap();
   var mStore=null, mAnalyser=null, mDest=null, mEl=null, mRaf=0;
-  function mediaBoost(){ return totalGain(); }  // normalisiert -> laut aber kontrolliert
+  // Fester Dichte-Boost (Klang/Druck) – unabhängig vom Lautstärke-Regler
+  function densityBoost(){ return (audioBuf ? (0.99/audioPeak) : 1) * dbToGain(10); }
+  // Lautstärke-Regler 0..24 -> Ausgangspegel 0.18..1.0 (klar hörbar)
+  function volLevel(){ return 0.18 + (currentDb()/24)*0.82; }
   function buildMediaGraph(el){
     if(!mctx) mctx = new (window.AudioContext||window.webkitAudioContext)();
     var g = graphs.get(el);
@@ -288,7 +281,7 @@
       var analyser = mctx.createAnalyser(); analyser.fftSize=512;
       var dest = mctx.createMediaStreamDestination();
       var store = {};
-      var last = buildChain(mctx, src, mediaBoost(), 2, store, true); // live = sanfte Kette
+      var last = buildChain(mctx, src, densityBoost(), 2, store, true); // live = sanfte Kette
       last.connect(analyser); analyser.connect(mctx.destination); analyser.connect(dest);
       g = { src:src, store:store, analyser:analyser, dest:dest };
       graphs.set(el, g);
@@ -300,7 +293,8 @@
     if(!mctx || !mStore || !mStore.eq) return;
     applyEq(mStore.eq); if(mStore.width) applyWidth(mStore.width);
     var loud=fx.loud?1:0;
-    mStore.drive.gain.value = mediaBoost()*(1+loud*0.6);
+    mStore.drive.gain.value = densityBoost()*(1+loud*0.6);   // Klang/Druck (fest)
+    if(mStore.out) mStore.out.gain.value = volLevel();         // Lautstärke-Regler (hörbar)
   }
   function meterTick(){
     if(!mAnalyser){ return; }
@@ -482,12 +476,14 @@
       isVideo=true;
       vid.src=mediaURL; vid.loop=repeat; vid.classList.remove('hidden');
       dllbl.textContent='Video speichern';
+      buildMediaGraph(vid); updateMediaFx();   // Routing sofort aktiv (iOS)
       setStatus('Video geladen – Play drücken, Klang wählen.');
       return;
     }
     isVideo=false;
     aud.src=mediaURL; aud.loop=repeat; aud.classList.remove('hidden');
     dllbl.textContent='Speichern';
+    buildMediaGraph(aud); updateMediaFx();     // Routing sofort aktiv (iOS) -> Lautstärke/EQ wirken
     setStatus('Lade …');
     var reader=new FileReader();
     reader.onload=function(){
@@ -501,10 +497,16 @@
   function loadFile(f){
     if(!f) return;
     if(!isMedia(f.name,f.type)){ setStatus('Bitte Audio- oder Video-Datei wählen.'); return; }
-    var id='t'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
-    currentTrackId=id;
     openMedia(f, f.name, f.type);
-    idbAdd({id:id, name:f.name, type:f.type||'', blob:f, added:Date.now()}).then(renderList).catch(function(){});
+    // Duplikat verhindern: gleiche Datei (Name + Größe) nicht nochmal speichern
+    idbAll().then(function(list){
+      var dup=null;
+      for(var i=0;i<list.length;i++){ var t=list[i]; if(t.name===f.name && t.blob && t.blob.size===f.size){ dup=t; break; } }
+      if(dup){ currentTrackId=dup.id; renderList(); return; }
+      var id='t'+Date.now()+'_'+Math.random().toString(36).slice(2,7);
+      currentTrackId=id;
+      return idbAdd({id:id, name:f.name, type:f.type||'', blob:f, added:Date.now()}).then(renderList);
+    }).catch(function(){});
   }
 
   // ==== Playlist (IndexedDB – bleibt dauerhaft gespeichert) ====
@@ -553,7 +555,7 @@
 
   // ==== Regler / Presets (LIVE) ====
   function rangeFill(el){ var mn=+el.min, mx=+el.max, p=(parseFloat(el.value)-mn)/(mx-mn)*100; el.style.setProperty('--p', p+'%'); }
-  function updateGainLabel(){ gainlbl.textContent='+'+currentDb()+' dB'; rangeFill(gain); }
+  function updateGainLabel(){ gainlbl.textContent=Math.round(volLevel()*100)+' %'; rangeFill(gain); }
   function updateFxLabels(){
     fxBassL.textContent=(fx.bass>0?'+':'')+fx.bass+' dB';
     fxTrebL.textContent=(fx.treble>0?'+':'')+fx.treble+' dB';
@@ -583,6 +585,11 @@
     repeat=!repeat; repBtn.setAttribute('aria-pressed', repeat?'true':'false');
     aud.loop=repeat; vid.loop=repeat;
   });
+
+  // iOS: AudioContext bei jeder Berührung aufwecken (sonst wirken Lautstärke/EQ nicht)
+  function resumeCtx(){ if(mctx && mctx.state==='suspended'){ mctx.resume(); updateMediaFx(); } }
+  document.addEventListener('touchend', resumeCtx, {passive:true});
+  document.addEventListener('click', resumeCtx);
 
   // Start-Klang (sofort gut)
   applyPreset('warmlux');
