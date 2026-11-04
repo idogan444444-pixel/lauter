@@ -338,31 +338,50 @@
     "idx++;if(idx>=L)idx=0;}this.g=g;this.i=idx;return true;}}",
     "registerProcessor('limiter',L);"
   ].join("");
+  var workletPromise=null;
+  // Lädt den Brickwall-Limiter EINMAL und meldet per Promise, wann er bereit ist.
+  function ensureWorklet(){
+    if(workletReady) return Promise.resolve(true);
+    if(!mctx){ mctx=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(!mctx.audioWorklet) return Promise.resolve(false);
+    if(workletPromise) return workletPromise;
+    var u=null; try{ u=URL.createObjectURL(new Blob([WORKLET_CODE],{type:'application/javascript'})); }catch(e){}
+    var load = u ? mctx.audioWorklet.addModule(u) : mctx.audioWorklet.addModule('limiter-worklet.js');
+    workletPromise = load.then(function(){ workletReady=true; return true; }).catch(function(){
+      return mctx.audioWorklet.addModule('limiter-worklet.js').then(function(){ workletReady=true; return true; }).catch(function(){ workletReady=false; return false; });
+    });
+    return workletPromise;
+  }
   function initAudio(){
     if(!mctx){ mctx=new (window.AudioContext||window.webkitAudioContext)(); }
-    if(!workletReady && mctx.audioWorklet){
-      var p;
-      try{ var u=URL.createObjectURL(new Blob([WORKLET_CODE],{type:'application/javascript'})); p=mctx.audioWorklet.addModule(u); }
-      catch(e){ p=mctx.audioWorklet.addModule('limiter-worklet.js'); }
-      p.then(function(){ workletReady=true; }).catch(function(){
-        mctx.audioWorklet.addModule('limiter-worklet.js').then(function(){ workletReady=true; }).catch(function(){ workletReady=false; });
-      });
-    }
+    ensureWorklet();
   }
+  // FIX v23: Graph erst bauen, wenn der Worklet-Limiter WIRKLICH bereit ist -> immer echter Brickwall, 0 Clipping.
+  // Source-Node nur EINMAL pro <audio>/<video> (sonst InvalidStateError), danach nur die Kette dahinter.
   function buildMediaGraph(el){
     initAudio();
     var g=graphs.get(el);
     if(!g){
-      var src=mctx.createMediaElementSource(el);
-      var an=mctx.createAnalyser();an.fftSize=256;
-      var dest=mctx.createMediaStreamDestination();
-      var store={};
-      var last=buildChain(mctx,src,liveDrive(),2,store,true);
-      last.connect(an);an.connect(mctx.destination);an.connect(dest);
-      g={src:src,store:store,analyser:an,dest:dest};
+      var src=mctx.createMediaElementSource(el);   // genau einmal pro Element
+      g={src:src,store:null,analyser:null,dest:null,built:false,building:false};
       graphs.set(el,g);
     }
-    mEl=el;mStore=g.store;mAnalyser=g.analyser;mDest=g.dest;
+    if(!g.built && !g.building){
+      g.building=true;
+      ensureWorklet().then(function(){
+        if(g.built) return;
+        var an=mctx.createAnalyser();an.fftSize=256;
+        var dest=mctx.createMediaStreamDestination();
+        var store={};
+        var last=buildChain(mctx,g.src,liveDrive(),2,store,true);
+        last.connect(an);an.connect(mctx.destination);an.connect(dest);
+        g.store=store;g.analyser=an;g.dest=dest;g.built=true;g.building=false;
+        if(mEl===el){ mStore=store;mAnalyser=an;mDest=dest; }
+        updateMediaFx();
+      });
+    }
+    mEl=el;
+    if(g.built){ mStore=g.store;mAnalyser=g.analyser;mDest=g.dest; }
   }
   function setP(param,val){ try{ param.setTargetAtTime(val, mctx.currentTime, 0.02); }catch(e){ try{param.value=val;}catch(_){} } } // ~60 ms = sofort & klickfrei
   function updateMediaFx(){
@@ -584,6 +603,7 @@
   fxBass.addEventListener('input', function(){ fx.bass=parseInt(fxBass.value,10)||0; updateFxLabels(); markPreset(''); updateMediaFx(); });
   fxTreb.addEventListener('input', function(){ fx.treble=parseInt(fxTreb.value,10)||0; updateFxLabels(); markPreset(''); updateMediaFx(); });
   dlBtn.addEventListener('click', download);
+  try{ initAudio(); }catch(e){}  // v23: Limiter schon beim Start laden -> vor dem ersten Play bereit
 
   // 3D Raum (Auto) – live umschaltbar, kein Neustart
   var d3chips=$('d3chips'), d3lbl=$('d3lbl');
