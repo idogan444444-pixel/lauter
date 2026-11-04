@@ -239,7 +239,7 @@
 
   var fx={ subbass:0, bass:0, mid:0, treble:0, width:1.0, loud:false };
   var PRESETS={
-    warmlux:{subbass:2,bass:2,mid:1,treble:2,width:1.15,loud:false},  // warm + klar, Stimme vorn
+    warmlux:{subbass:2,bass:2,mid:2,treble:3,width:1.15,loud:false},  // warm + klar, Stimme vorn
     concert:{subbass:3,bass:3,mid:0,treble:2,width:1.3,loud:false},   // druckvoll, breiter
     studio:{subbass:0,bass:1,mid:2,treble:3,width:1.05,loud:false},   // sauberste, präzise
     autobass:{subbass:5,bass:5,mid:0,treble:1,width:1.2,loud:false}   // Bass-Lover
@@ -255,10 +255,11 @@
   function makeEq(c){
     var sub=c.createBiquadFilter();sub.type='lowshelf';sub.frequency.value=70;
     var bass=c.createBiquadFilter();bass.type='peaking';bass.frequency.value=150;bass.Q.value=0.9;
-    var mud=c.createBiquadFilter();mud.type='peaking';mud.frequency.value=300;mud.Q.value=1.1;mud.gain.value=-2.5; // fester Matsch-Cut (klarer)
-    var mid=c.createBiquadFilter();mid.type='peaking';mid.frequency.value=2200;mid.Q.value=0.8; // Präsenz/Stimme
-    var treb=c.createBiquadFilter();treb.type='highshelf';treb.frequency.value=8000;
-    sub.connect(bass);bass.connect(mud);mud.connect(mid);mid.connect(treb);
+    var mud=c.createBiquadFilter();mud.type='peaking';mud.frequency.value=320;mud.Q.value=1.1;mud.gain.value=-3.5; // stärkerer Matsch-Cut = klarer
+    var mid=c.createBiquadFilter();mid.type='peaking';mid.frequency.value=2600;mid.Q.value=0.9; // Präsenz/Stimme deutlicher
+    var air=c.createBiquadFilter();air.type='highshelf';air.frequency.value=11000;air.gain.value=2.5; // feste "Luft" = frischer/klarer
+    var treb=c.createBiquadFilter();treb.type='highshelf';treb.frequency.value=7500;
+    sub.connect(bass);bass.connect(mud);mud.connect(mid);mid.connect(air);air.connect(treb);
     return {first:sub,last:treb,sub:sub,bass:bass,mid:mid,treb:treb};
   }
   function applyEq(eq){ eq.sub.gain.value=fx.subbass;eq.bass.gain.value=fx.bass;eq.mid.gain.value=fx.mid;eq.treb.gain.value=fx.treble; }
@@ -277,10 +278,10 @@
   // 3D Raum (Auto): 0 Aus · 1 Breit · 2 Rundum
   var space=0;
   function effectiveWidth(){ return space===1?1.55 : space===2?1.95 : fx.width; }
-  function spaceWet(){ return space===2?0.16:0; }  // nur Rundum = etwas Raum/Reverb
+  function spaceWet(){ return space===2?0.12:0; }  // nur Rundum = dezenter, klarer Raum
   function makeImpulse(c){
-    var len=Math.floor(c.sampleRate*0.4), b=c.createBuffer(2,len,c.sampleRate);
-    for(var ch=0;ch<2;ch++){ var d=b.getChannelData(ch); for(var i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); } }
+    var len=Math.floor(c.sampleRate*0.26), b=c.createBuffer(2,len,c.sampleRate); // kürzer = klarer, schneller
+    for(var ch=0;ch<2;ch++){ var d=b.getChannelData(ch); for(var i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,3.2); } }
     return b;
   }
   function applyWidth(w){ var ww=effectiveWidth(); w.Ls.gain.value=0.5*ww; w.Rs.gain.value=-0.5*ww; }
@@ -363,12 +364,15 @@
     }
     mEl=el;mStore=g.store;mAnalyser=g.analyser;mDest=g.dest;
   }
+  function setP(param,val){ try{ param.setTargetAtTime(val, mctx.currentTime, 0.02); }catch(e){ try{param.value=val;}catch(_){} } } // ~60 ms = sofort & klickfrei
   function updateMediaFx(){
     if(!mctx||!mStore||!mStore.eq) return;
-    applyEq(mStore.eq); if(mStore.width) applyWidth(mStore.width);
-    if(mStore.wet) mStore.wet.gain.value=spaceWet();
+    var eq=mStore.eq;
+    setP(eq.sub.gain,fx.subbass); setP(eq.bass.gain,fx.bass); setP(eq.mid.gain,fx.mid); setP(eq.treb.gain,fx.treble);
+    if(mStore.width){ var ww=effectiveWidth(); setP(mStore.width.Ls.gain,0.5*ww); setP(mStore.width.Rs.gain,-0.5*ww); }
+    if(mStore.wet) setP(mStore.wet.gain, spaceWet());
     var loud=fx.loud?1:0;
-    mStore.drive.gain.value=liveDrive()*(1+loud*0.6);
+    setP(mStore.drive.gain, liveDrive()*(1+loud*0.6));
   }
 
   // ---- Export (nur Audio): Mastering ----
