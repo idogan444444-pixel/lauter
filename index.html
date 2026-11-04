@@ -277,31 +277,62 @@
     var comp=c.createDynamicsCompressor();
     if(live){ comp.threshold.value=-8;comp.knee.value=12;comp.ratio.value=3.5;comp.attack.value=0.012;comp.release.value=0.28; }
     else{ comp.threshold.value=-3-i*7-loud*6;comp.knee.value=6;comp.ratio.value=6+i*14+loud*4;comp.attack.value=0.003;comp.release.value=0.25; }
-    var lim=c.createDynamicsCompressor();
-    lim.threshold.value=live?-1:-1.5;lim.knee.value=live?2:0;lim.ratio.value=live?8:20;lim.attack.value=live?0.004:0.001;lim.release.value=live?0.12:0.05;
-    var trim=c.createGain();trim.gain.value=live?0.95:0.9;
-    var out=c.createGain();out.gain.value=live?volLevel():1;
-    node.connect(drive);drive.connect(comp);comp.connect(lim);lim.connect(trim);trim.connect(out);
+    var limNode=null;
+    if(live && workletReady && typeof AudioWorkletNode!=='undefined'){
+      try{ limNode=new AudioWorkletNode(c,'limiter',{channelCount:2,channelCountMode:'explicit',outputChannelCount:[2]}); }catch(e){ limNode=null; }
+    }
+    if(!limNode){ // Fallback ohne Worklet
+      var lim=c.createDynamicsCompressor();
+      lim.threshold.value=-1;lim.knee.value=0;lim.ratio.value=20;lim.attack.value=live?0.002:0.001;lim.release.value=live?0.10:0.05;
+      limNode=lim;
+    }
+    var trim=c.createGain();trim.gain.value=live?0.99:0.9;
+    var out=c.createGain();out.gain.value=1;
+    node.connect(drive);drive.connect(comp);comp.connect(limNode);limNode.connect(trim);trim.connect(out);
     if(store){ store.eq=eq;store.width=width;store.drive=drive;store.comp=comp;store.out=out; }
     return out;
   }
   function peakOf(buf){ var p=0;for(var ch=0;ch<buf.numberOfChannels;ch++){var d=buf.getChannelData(ch);for(var i=0;i<d.length;i++){var a=Math.abs(d[i]);if(a>p)p=a;}}return p||1; }
   function totalGain(){ var norm=audioBuf?(0.99/audioPeak):1; return norm*dbToGain(currentDb()); }
-  // ~40% lauter als normal: moderater, sauberer Dichte-Boost (nicht übersteuert)
-  function densityBoost(){ return (audioBuf?(0.99/audioPeak):1)*1.4; }
-  function volLevel(){ return 0.18+(currentDb()/24)*0.82; }
+  // Lautstärke-Regler spreizt den Antrieb über ~34 dB: leise (−10 dB) bis brachial (+24 dB).
+  // Großer hörbarer Unterschied; der Lookahead-Limiter hält dabei alles sauber (kein Clipping).
+  function liveDrive(){ var driveDb = -10 + (currentDb()/24)*34; return (audioBuf?(0.99/audioPeak):1) * dbToGain(driveDb); }
 
   // ---- LIVE Media-Graph ----
-  var mctx=null, graphs=new WeakMap(), mStore=null, mAnalyser=null, mDest=null, mEl=null;
+  var mctx=null, graphs=new WeakMap(), mStore=null, mAnalyser=null, mDest=null, mEl=null, workletReady=false;
+  // Limiter-Worklet inline (als Blob geladen -> läuft auch in der Mac-App über file://)
+  var WORKLET_CODE = [
+    "class L extends AudioWorkletProcessor{",
+    "constructor(){super();this.c=0.97;this.l=Math.max(16,Math.round(0.003*sampleRate));this.r=Math.exp(-1/(0.08*sampleRate));this.g=1;this.b=null;this.i=0;}",
+    "process(ins,outs){const I=ins[0],O=outs[0];if(!I||!I.length)return true;const ch=I.length,n=I[0]?I[0].length:0;",
+    "if(!this.b||this.b.length!==ch){this.b=[];for(let c=0;c<ch;c++)this.b.push(new Float32Array(this.l));this.i=0;}",
+    "const L=this.l,C=this.c,R=this.r;let g=this.g,idx=this.i;",
+    "for(let i=0;i<n;i++){let p=0;for(let c=0;c<ch;c++){const a=Math.abs(I[c][i]);if(a>p)p=a;}",
+    "const t=p>C?C/p:1;if(t<g){g=t;}else{g=g*R+t*(1-R);if(g>1)g=1;}",
+    "for(let c=0;c<ch;c++){const bf=this.b[c];const d=bf[idx];bf[idx]=I[c][i];let y=d*g;if(y>C)y=C;else if(y<-C)y=-C;if(O[c])O[c][i]=y;}",
+    "idx++;if(idx>=L)idx=0;}this.g=g;this.i=idx;return true;}}",
+    "registerProcessor('limiter',L);"
+  ].join("");
+  function initAudio(){
+    if(!mctx){ mctx=new (window.AudioContext||window.webkitAudioContext)(); }
+    if(!workletReady && mctx.audioWorklet){
+      var p;
+      try{ var u=URL.createObjectURL(new Blob([WORKLET_CODE],{type:'application/javascript'})); p=mctx.audioWorklet.addModule(u); }
+      catch(e){ p=mctx.audioWorklet.addModule('limiter-worklet.js'); }
+      p.then(function(){ workletReady=true; }).catch(function(){
+        mctx.audioWorklet.addModule('limiter-worklet.js').then(function(){ workletReady=true; }).catch(function(){ workletReady=false; });
+      });
+    }
+  }
   function buildMediaGraph(el){
-    if(!mctx) mctx=new (window.AudioContext||window.webkitAudioContext)();
+    initAudio();
     var g=graphs.get(el);
     if(!g){
       var src=mctx.createMediaElementSource(el);
       var an=mctx.createAnalyser();an.fftSize=256;
       var dest=mctx.createMediaStreamDestination();
       var store={};
-      var last=buildChain(mctx,src,densityBoost(),2,store,true);
+      var last=buildChain(mctx,src,liveDrive(),2,store,true);
       last.connect(an);an.connect(mctx.destination);an.connect(dest);
       g={src:src,store:store,analyser:an,dest:dest};
       graphs.set(el,g);
@@ -312,8 +343,7 @@
     if(!mctx||!mStore||!mStore.eq) return;
     applyEq(mStore.eq); if(mStore.width) applyWidth(mStore.width);
     var loud=fx.loud?1:0;
-    mStore.drive.gain.value=densityBoost()*(1+loud*0.6);
-    if(mStore.out) mStore.out.gain.value=volLevel();
+    mStore.drive.gain.value=liveDrive()*(1+loud*0.6);
   }
 
   // ---- Export (nur Audio): Mastering ----
@@ -501,7 +531,7 @@
 
   // ---- Regler / Presets ----
   function rangeFill(el){ var mn=+el.min,mx=+el.max,p=(parseFloat(el.value)-mn)/(mx-mn)*100; el.style.setProperty('--p',p+'%'); }
-  function updateGainLabel(){ gainlbl.textContent=Math.round(volLevel()*100)+' %'; rangeFill(gain); }
+  function updateGainLabel(){ gainlbl.textContent=Math.round(currentDb()/24*100)+' %'; rangeFill(gain); }
   function updateFxLabels(){
     fxBassL.textContent=(fx.bass>0?'+':'')+fx.bass+' dB';
     fxTrebL.textContent=(fx.treble>0?'+':'')+fx.treble+' dB';
@@ -536,6 +566,7 @@
   document.addEventListener('click', resumeCtx);
 
   applyPreset('warmlux'); updateGainLabel();
+  initAudio();   // Limiter-Worklet früh laden (sauberer Laut-Limiter bereit)
   idbOpen().then(renderList).catch(function(){ renderList(); });
 
   if('serviceWorker' in navigator){ window.addEventListener('load', function(){ navigator.serviceWorker.register('service-worker.js').catch(function(){}); }); }
