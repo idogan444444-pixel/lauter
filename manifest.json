@@ -1,0 +1,14 @@
+{
+  "name": "Lauter",
+  "short_name": "Lauter",
+  "description": "Leise Lieder lauter machen – offline, mit Limiter gegen Verzerren.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f0f10",
+  "theme_color": "#d97757",
+  "lang": "de",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "apple-touch-icon.png", "sizes": "180x180", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
