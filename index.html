@@ -190,6 +190,13 @@
           <input id="fx_bass" type="range" min="-12" max="12" step="1" value="0">
           <label class="row" for="fx_treb"><span>Höhen</span><span id="fx_treblbl">0 dB</span></label>
           <input id="fx_treb" type="range" min="-12" max="12" step="1" value="0">
+
+          <label class="row"><span>🌀 3D Raum (Auto)</span><span id="d3lbl">Aus</span></label>
+          <div class="chips" id="d3chips" role="group" aria-label="3D Raum">
+            <button class="chip" data-space="0" aria-pressed="true">Aus</button>
+            <button class="chip" data-space="1" aria-pressed="false">Breit</button>
+            <button class="chip" data-space="2" aria-pressed="false">Rundum</button>
+          </div>
         </div>
       </div>
 
@@ -267,12 +274,28 @@
     var mg=c.createChannelMerger(2);Lo.connect(mg,0,0);Ro.connect(mg,0,1);
     return {first:sp,last:mg,Ls:Ls,Rs:Rs};
   }
-  function applyWidth(w){ w.Ls.gain.value=0.5*fx.width; w.Rs.gain.value=-0.5*fx.width; }
+  // 3D Raum (Auto): 0 Aus · 1 Breit · 2 Rundum
+  var space=0;
+  function effectiveWidth(){ return space===1?1.55 : space===2?1.95 : fx.width; }
+  function spaceWet(){ return space===2?0.16:0; }  // nur Rundum = etwas Raum/Reverb
+  function makeImpulse(c){
+    var len=Math.floor(c.sampleRate*0.4), b=c.createBuffer(2,len,c.sampleRate);
+    for(var ch=0;ch<2;ch++){ var d=b.getChannelData(ch); for(var i=0;i<len;i++){ d[i]=(Math.random()*2-1)*Math.pow(1-i/len,2.6); } }
+    return b;
+  }
+  function applyWidth(w){ var ww=effectiveWidth(); w.Ls.gain.value=0.5*ww; w.Rs.gain.value=-0.5*ww; }
 
   function buildChain(c,src,driveFactor,channels,store,live){
     var eq=makeEq(c);applyEq(eq);src.connect(eq.first);
-    var node=eq.last,width=null;
+    var node=eq.last,width=null,wet=null;
     if(channels>=2){ width=makeWidth(c);applyWidth(width);eq.last.connect(width.first);node=width.last; }
+    if(live){ // 3D-Raum: paralleler Reverb-Weg (wet=0 wenn aus -> transparent)
+      var conv=c.createConvolver(); conv.buffer=makeImpulse(c);
+      wet=c.createGain(); wet.gain.value=spaceWet();
+      var merge=c.createGain();
+      node.connect(merge); node.connect(conv); conv.connect(wet); wet.connect(merge);
+      node=merge;
+    }
     var i=currentDb()/24, loud=fx.loud?1:0;
     var drive=c.createGain();drive.gain.value=driveFactor*(1+loud*0.6);
     var comp=c.createDynamicsCompressor();
@@ -290,7 +313,7 @@
     var trim=c.createGain();trim.gain.value=live?0.99:0.9;
     var out=c.createGain();out.gain.value=1;
     node.connect(drive);drive.connect(comp);comp.connect(limNode);limNode.connect(trim);trim.connect(out);
-    if(store){ store.eq=eq;store.width=width;store.drive=drive;store.comp=comp;store.out=out; }
+    if(store){ store.eq=eq;store.width=width;store.drive=drive;store.comp=comp;store.out=out;store.wet=wet; }
     return out;
   }
   function peakOf(buf){ var p=0;for(var ch=0;ch<buf.numberOfChannels;ch++){var d=buf.getChannelData(ch);for(var i=0;i<d.length;i++){var a=Math.abs(d[i]);if(a>p)p=a;}}return p||1; }
@@ -343,6 +366,7 @@
   function updateMediaFx(){
     if(!mctx||!mStore||!mStore.eq) return;
     applyEq(mStore.eq); if(mStore.width) applyWidth(mStore.width);
+    if(mStore.wet) mStore.wet.gain.value=spaceWet();
     var loud=fx.loud?1:0;
     mStore.drive.gain.value=liveDrive()*(1+loud*0.6);
   }
@@ -550,6 +574,16 @@
   fxBass.addEventListener('input', function(){ fx.bass=parseInt(fxBass.value,10)||0; updateFxLabels(); markPreset(''); updateMediaFx(); });
   fxTreb.addEventListener('input', function(){ fx.treble=parseInt(fxTreb.value,10)||0; updateFxLabels(); markPreset(''); updateMediaFx(); });
   dlBtn.addEventListener('click', download);
+
+  // 3D Raum (Auto) – live umschaltbar, kein Neustart
+  var d3chips=$('d3chips'), d3lbl=$('d3lbl');
+  d3chips.addEventListener('click', function(e){
+    var b=e.target.closest('button'); if(!b) return;
+    space=parseInt(b.dataset.space,10)||0;
+    d3chips.querySelectorAll('button').forEach(function(x){ x.setAttribute('aria-pressed', x===b?'true':'false'); });
+    d3lbl.textContent = space===1?'Breit':(space===2?'Rundum':'Aus');
+    updateMediaFx();
+  });
 
   // Aufklappen (Klang + Meine Musik)
   function wireCollapse(headId, bodyId){
