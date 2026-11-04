@@ -134,10 +134,10 @@
   <div class="card">
     <button id="pick" class="btn primary" type="button">＋ Musik / Video hinzufügen</button>
     <input id="file" type="file" accept="audio/*,video/*" class="hidden">
-    <button id="yt" class="btn ghost" type="button" style="margin-top:9px">
+    <a id="yt" class="btn ghost" href="https://m.youtube.com/" target="_blank" rel="noopener" style="margin-top:9px;text-decoration:none">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="#ff3b30" aria-hidden="true"><path d="M23 7.5a3 3 0 0 0-2.1-2.1C19 5 12 5 12 5s-7 0-8.9.4A3 3 0 0 0 1 7.5 31 31 0 0 0 .6 12 31 31 0 0 0 1 16.5a3 3 0 0 0 2.1 2.1C5 19 12 19 12 19s7 0 8.9-.4a3 3 0 0 0 2.1-2.1A31 31 0 0 0 23.4 12 31 31 0 0 0 23 7.5zM9.8 15.3V8.7l5.7 3.3z"/></svg>
       YouTube ansehen <span style="opacity:.6;font-weight:500">· werbefrei in Brave</span>
-    </button>
+    </a>
 
     <div id="player" class="hidden" style="margin-top:14px" aria-live="polite">
       <video id="vid" class="hidden" controls playsinline preload="metadata"></video>
@@ -570,8 +570,7 @@
   function applyPreset(name){ var p=PRESETS[name]; if(!p) return; fx.subbass=p.subbass;fx.bass=p.bass;fx.mid=p.mid;fx.treble=p.treble;fx.width=p.width;fx.loud=p.loud; updateFxLabels(); markPreset(name); updateMediaFx(); }
 
   pickBtn.addEventListener('click', function(){ fileInput.click(); });
-  // YouTube werbefrei: Link extern öffnen (Mac-App leitet an Brave; iPhone öffnet Standard-Browser)
-  document.getElementById('yt').addEventListener('click', function(){ window.open('https://m.youtube.com/','_blank','noopener'); });
+  // YouTube = echter <a target=_blank> Link -> iPhone gibt ihn an Standard-Browser (Brave), Mac-App an YouTube.app
   fileInput.addEventListener('change', function(e){ if(e.target.files[0]) loadFile(e.target.files[0]); fileInput.value=''; });
   chipsWrap.addEventListener('click', function(e){ var b=e.target.closest('button'); if(b) applyPreset(b.dataset.preset); });
   gain.addEventListener('input', function(){ updateGainLabel(); updateMediaFx(); });
