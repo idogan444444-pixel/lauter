@@ -185,7 +185,7 @@
             <button class="chip" data-preset="autobass" aria-pressed="false">Bass+</button>
           </div>
           <label class="row" for="gain"><span>Lautstärke</span><span id="gainlbl">87 %</span></label>
-          <input id="gain" type="range" min="0" max="24" step="1" value="20">
+          <input id="gain" type="range" min="0" max="24" step="1" value="12">
           <label class="row" for="fx_bass"><span>Bass</span><span id="fx_basslbl">0 dB</span></label>
           <input id="fx_bass" type="range" min="-12" max="12" step="1" value="0">
           <label class="row" for="fx_treb"><span>Höhen</span><span id="fx_treblbl">0 dB</span></label>
@@ -232,10 +232,10 @@
 
   var fx={ subbass:0, bass:0, mid:0, treble:0, width:1.0, loud:false };
   var PRESETS={
-    warmlux:{subbass:5,bass:3,mid:0,treble:3,width:1.4,loud:true},
-    concert:{subbass:4,bass:4,mid:-1,treble:2,width:1.6,loud:true},
-    studio:{subbass:1,bass:1,mid:1,treble:3,width:1.1,loud:false},
-    autobass:{subbass:7,bass:6,mid:-1,treble:2,width:1.2,loud:true}
+    warmlux:{subbass:2,bass:2,mid:1,treble:2,width:1.15,loud:false},  // warm + klar, Stimme vorn
+    concert:{subbass:3,bass:3,mid:0,treble:2,width:1.3,loud:false},   // druckvoll, breiter
+    studio:{subbass:0,bass:1,mid:2,treble:3,width:1.05,loud:false},   // sauberste, präzise
+    autobass:{subbass:5,bass:5,mid:0,treble:1,width:1.2,loud:false}   // Bass-Lover
   };
   var activePreset='';
 
@@ -248,9 +248,10 @@
   function makeEq(c){
     var sub=c.createBiquadFilter();sub.type='lowshelf';sub.frequency.value=70;
     var bass=c.createBiquadFilter();bass.type='peaking';bass.frequency.value=150;bass.Q.value=0.9;
-    var mid=c.createBiquadFilter();mid.type='peaking';mid.frequency.value=1000;mid.Q.value=0.8;
-    var treb=c.createBiquadFilter();treb.type='highshelf';treb.frequency.value=7000;
-    sub.connect(bass);bass.connect(mid);mid.connect(treb);
+    var mud=c.createBiquadFilter();mud.type='peaking';mud.frequency.value=300;mud.Q.value=1.1;mud.gain.value=-2.5; // fester Matsch-Cut (klarer)
+    var mid=c.createBiquadFilter();mid.type='peaking';mid.frequency.value=2200;mid.Q.value=0.8; // Präsenz/Stimme
+    var treb=c.createBiquadFilter();treb.type='highshelf';treb.frequency.value=8000;
+    sub.connect(bass);bass.connect(mud);mud.connect(mid);mid.connect(treb);
     return {first:sub,last:treb,sub:sub,bass:bass,mid:mid,treb:treb};
   }
   function applyEq(eq){ eq.sub.gain.value=fx.subbass;eq.bass.gain.value=fx.bass;eq.mid.gain.value=fx.mid;eq.treb.gain.value=fx.treble; }
@@ -275,7 +276,7 @@
     var i=currentDb()/24, loud=fx.loud?1:0;
     var drive=c.createGain();drive.gain.value=driveFactor*(1+loud*0.6);
     var comp=c.createDynamicsCompressor();
-    if(live){ comp.threshold.value=-8;comp.knee.value=12;comp.ratio.value=3.5;comp.attack.value=0.012;comp.release.value=0.28; }
+    if(live){ comp.threshold.value=-6;comp.knee.value=10;comp.ratio.value=2.3;comp.attack.value=0.02;comp.release.value=0.25; } // lockerer = mehr Punch/Dynamik
     else{ comp.threshold.value=-3-i*7-loud*6;comp.knee.value=6;comp.ratio.value=6+i*14+loud*4;comp.attack.value=0.003;comp.release.value=0.25; }
     var limNode=null;
     if(live && workletReady && typeof AudioWorkletNode!=='undefined'){
@@ -294,9 +295,9 @@
   }
   function peakOf(buf){ var p=0;for(var ch=0;ch<buf.numberOfChannels;ch++){var d=buf.getChannelData(ch);for(var i=0;i<d.length;i++){var a=Math.abs(d[i]);if(a>p)p=a;}}return p||1; }
   function totalGain(){ var norm=audioBuf?(0.99/audioPeak):1; return norm*dbToGain(currentDb()); }
-  // Lautstärke-Regler spreizt den Antrieb über ~34 dB: leise (−10 dB) bis brachial (+24 dB).
-  // Großer hörbarer Unterschied; der Lookahead-Limiter hält dabei alles sauber (kein Clipping).
-  function liveDrive(){ var driveDb = -10 + (currentDb()/24)*34; return (audioBuf?(0.99/audioPeak):1) * dbToGain(driveDb); }
+  // Basis = auf Vollpegel normalisiert (schon laut + punchy). Regler legt 0..14 dB Antrieb drauf:
+  // unten = max Punch/Dynamik, oben = maximal laut. Darüber bringt mehr Antrieb nur Matsch, kein Plus.
+  function liveDrive(){ var driveDb = (currentDb()/24)*14; return (audioBuf?(0.99/audioPeak):1) * dbToGain(driveDb); }
 
   // ---- LIVE Media-Graph ----
   var mctx=null, graphs=new WeakMap(), mStore=null, mAnalyser=null, mDest=null, mEl=null, workletReady=false;
